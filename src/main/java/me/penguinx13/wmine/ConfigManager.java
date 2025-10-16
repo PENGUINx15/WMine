@@ -81,5 +81,4 @@ public class ConfigManager {
         Set<String> keySet = Objects.requireNonNull(config.getConfigurationSection("blocks")).getKeys(false);
         return new ArrayList<>(keySet);
     }
-
 }
