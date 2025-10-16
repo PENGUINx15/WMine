@@ -1,0 +1,34 @@
+location:
+  world: world
+  minX: 1181
+  minY: 106
+  minZ: 1018
+  maxX: 1189
+  maxY: 112
+  maxZ: 1026
+blocks:
+  1:
+    block: COAL_ORE
+    cost: 1
+    chance: 50
+  2:
+    block: IRON_ORE
+    cost: 2
+    chance: 40
+  3:
+    block: GOLD_ORE
+    cost: 3
+    chance: 30
+  4:
+    block: DIAMOND_ORE
+    cost: 4
+    chance: 20
+  5:
+    block: EMERALD_ORE
+    cost: 5
+    chance: 10
+
+randomPlace: false
+defaultValues:
+  backpack: 50
+  costmultiplier: 1.0

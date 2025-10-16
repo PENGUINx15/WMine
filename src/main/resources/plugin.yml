@@ -1,0 +1,4 @@
+name: WMine
+version: '1.2.0'
+main: me.penguinx13.wmine.WMine
+api-version: '1.19'
