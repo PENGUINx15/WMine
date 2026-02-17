@@ -28,6 +28,8 @@ public class ConfigManager {
     public Location maxLocation;
 
     public boolean randomPlace;
+    private final Random random = new Random();
+    private final List<Material> randomRewardPool = new ArrayList<>();
 
 
 
@@ -38,6 +40,7 @@ public class ConfigManager {
 
     public void loadConfig() {
         blockRewards.clear();
+        randomRewardPool.clear();
 
         ConfigurationSection blocksSection = config.getConfigurationSection("blocks");
         if (blocksSection != null) {
@@ -50,8 +53,13 @@ public class ConfigManager {
                     if (blockType != null) {
                         int reward = blockData.getInt("cost", 0);
                         blockRewards.put(blockType, reward);
+
+                        int chance = Math.max(0, blockData.getInt("chance", 0));
+                        for (int i = 0; i < chance; i++) {
+                            randomRewardPool.add(blockType);
+                        }
                     } else {
-                    	plugin.getLogger().warning("Invalid block in blocks." + blockKey + ".block: " + blockName);
+	                    plugin.getLogger().warning("Invalid block in blocks." + blockKey + ".block: " + blockName);
                     }
                 }
             }
@@ -80,5 +88,12 @@ public class ConfigManager {
     public List<String> getBlockKeys() {
         Set<String> keySet = Objects.requireNonNull(config.getConfigurationSection("blocks")).getKeys(false);
         return new ArrayList<>(keySet);
+    }
+
+    public Material getRandomRewardMaterial(Material fallback) {
+        if (randomRewardPool.isEmpty()) {
+            return fallback;
+        }
+        return randomRewardPool.get(random.nextInt(randomRewardPool.size()));
     }
 }

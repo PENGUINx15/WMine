@@ -3,33 +3,31 @@ package me.penguinx13.wmine;
 import java.util.Objects;
 import java.util.UUID;
 
+import net.milkbowl.vault.economy.Economy;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Listener;
+import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
-import net.milkbowl.vault.economy.Economy;
 
 public class WMine extends JavaPlugin implements Listener, CommandExecutor {
     private ConfigManager config;
     private DataConfigManager data;
 
-
     @Override
     public void onEnable() {
-
         saveDefaultConfig();
+
         config = new ConfigManager(this);
         config.loadConfig();
 
         data = new DataConfigManager(this);
         data.setupDataConfig();
 
-        BlockBreakListener blockBreakListener = new BlockBreakListener(config, this, data);  // Створіть новий об'єкт
-        getServer().getPluginManager().registerEvents(blockBreakListener, this); // Зареєструйте події
-
+        getServer().getPluginManager().registerEvents(new BlockBreakListener(config, this, data), this);
         Objects.requireNonNull(getCommand("wmine")).setExecutor(new CommandsExecutor(this, data));
 
         if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
@@ -43,32 +41,30 @@ public class WMine extends JavaPlugin implements Listener, CommandExecutor {
     }
 
     public double getBlockReward(Player player, Material blockType) {
-        if (data != null && config != null) {
-            ConfigurationSection playerSection = data.getDataConfig().getConfigurationSection("players." + player.getName());
-
-            if (playerSection != null) {
-                double costMultiplier = playerSection.getDouble("costmultiplier", config.costmultiplier);
-                Integer reward = config.blockRewards.get(blockType);
-
-
-                if (reward != null) {
-                    return reward * costMultiplier;
-                }
-            }
+        if (blockType == null) {
+            return 0;
         }
-        assert config != null;
-        return config.blockRewards.get(blockType);
+
+        Integer reward = config.blockRewards.get(blockType);
+        if (reward == null) {
+            return 0;
+        }
+
+        return reward * getCostMultiplier(player);
     }
 
     public double getCostMultiplier(Player player) {
-        ConfigurationSection playerSection = data.getDataConfig().getConfigurationSection("players." + player.getName());
-        return playerSection != null ? playerSection.getDouble("costmultiplier") : getConfig().getDouble("defaultValues.costmultiplier");
+        ConfigurationSection playerSection = getPlayerSection(player);
+        return playerSection != null
+                ? playerSection.getDouble("costmultiplier", config.costmultiplier)
+                : config.costmultiplier;
     }
 
-
     public int getBackpackSize(Player player) {
-        ConfigurationSection playerSection = data.getDataConfig().getConfigurationSection("players." + player.getName());
-        return playerSection != null ? playerSection.getInt("backpack") : getConfig().getInt("defaultValues.backpack");
+        ConfigurationSection playerSection = getPlayerSection(player);
+        return playerSection != null
+                ? playerSection.getInt("backpack", config.backpack)
+                : config.backpack;
     }
 
     public int getBlocksBroken(Player player) {
@@ -76,44 +72,38 @@ public class WMine extends JavaPlugin implements Listener, CommandExecutor {
         return config.blocksBroken.getOrDefault(playerId, 0);
     }
 
-
-
     public void claimCurrencyReward(Player player) {
         UUID playerId = player.getUniqueId();
-        if (config != null) {
-            int currencyEarned = config.playerEarnings.getOrDefault(playerId, 0);
+        int currencyEarned = config.playerEarnings.getOrDefault(playerId, 0);
 
-            Economy economy = Objects.requireNonNull(getServer().getServicesManager().getRegistration(Economy.class)).getProvider();
-            economy.depositPlayer(player, currencyEarned);
-
-            player.sendMessage("§fВы получили зарплату §6" + currencyEarned + "$");
-            config.playerEarnings.remove(playerId);
-
-            config.blocksBroken.remove(playerId);
-        } else {
-            getLogger().info("config = null");
+        RegisteredServiceProvider<Economy> registration = getServer().getServicesManager().getRegistration(Economy.class);
+        if (registration == null) {
+            getLogger().warning("Vault Economy provider not found.");
+            player.sendMessage("§cЭкономика недоступна.");
+            return;
         }
-    }
 
+        Economy economy = registration.getProvider();
+        economy.depositPlayer(player, currencyEarned);
+
+        player.sendMessage("§fВы получили зарплату §6" + currencyEarned + "$");
+        config.playerEarnings.remove(playerId);
+        config.blocksBroken.remove(playerId);
+    }
 
     public void showPlayerInfo(Player player) {
         UUID playerId = player.getUniqueId();
         int currencyEarned = config.playerEarnings.getOrDefault(playerId, 0);
         int blocksBrokenByPlayer = config.blocksBroken.getOrDefault(playerId, 0);
+        int backpackSize = getBackpackSize(player);
 
-        if (config != null) {
-            ConfigurationSection playerSection = data.getDataConfig().getConfigurationSection("players." + player.getName());
-
-            if (playerSection != null) {
-                int backpackSize = playerSection.getInt("backpack", config.backpack);
-                player.sendMessage("§f---------------------[§6Шахта§f]---------------------");
-                player.sendMessage("§fОжидаемая зарплата: §6" + currencyEarned + "$");
-                player.sendMessage("§fРюкзак: §e" + blocksBrokenByPlayer + "§f/§6" + backpackSize);
-                player.sendMessage("§f§n-------------------------------------------------");
-            }
-        } else {
-            getLogger().info("config = null");
-        }
+        player.sendMessage("§f---------------------[§6Шахта§f]---------------------");
+        player.sendMessage("§fОжидаемая зарплата: §6" + currencyEarned + "$");
+        player.sendMessage("§fРюкзак: §e" + blocksBrokenByPlayer + "§f/§6" + backpackSize);
+        player.sendMessage("§f§n-------------------------------------------------");
     }
 
+    private ConfigurationSection getPlayerSection(Player player) {
+        return data.getDataConfig().getConfigurationSection("players." + player.getName());
+    }
 }
