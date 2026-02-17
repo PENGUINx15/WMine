@@ -3,6 +3,7 @@ package me.penguinx13.wmine;
 import java.util.Objects;
 import java.util.UUID;
 
+import me.penguinx13.wapi.Managers.ConfigManager;
 import net.milkbowl.vault.economy.Economy;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -14,20 +15,20 @@ import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public class WMine extends JavaPlugin implements Listener, CommandExecutor {
-    private ConfigManager config;
+    private ConfigManager configManager;
     private DataConfigManager data;
 
     @Override
     public void onEnable() {
-        saveDefaultConfig();
+        configManager = new ConfigManager(this);
+        configManager.registerConfig("config.yml");
+        configManager.registerConfig("data.yml");
 
-        config = new ConfigManager(this);
-        config.loadConfig();
 
         data = new DataConfigManager(this);
         data.setupDataConfig();
 
-        getServer().getPluginManager().registerEvents(new BlockBreakListener(config, this, data), this);
+        getServer().getPluginManager().registerEvents(new BlockBreakListener(configManager, this, data), this);
         Objects.requireNonNull(getCommand("wmine")).setExecutor(new CommandsExecutor(this, data));
 
         if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
