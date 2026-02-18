@@ -28,7 +28,7 @@ public class WMine extends JavaPlugin implements Listener, CommandExecutor {
         data = new DataConfigManager(this);
         data.setupDataConfig();
 
-        getServer().getPluginManager().registerEvents(new BlockBreakListener(configManager, this, data), this);
+        getServer().getPluginManager().registerEvents(new BlockBreakListener(this, configManager), this);
         Objects.requireNonNull(getCommand("wmine")).setExecutor(new CommandsExecutor(this, data));
 
         if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {

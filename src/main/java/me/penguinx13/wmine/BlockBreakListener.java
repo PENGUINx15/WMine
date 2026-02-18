@@ -1,111 +1,123 @@
 package me.penguinx13.wmine;
 
-import java.util.UUID;
-
+import me.penguinx13.wapi.Managers.ConfigManager;
 import net.md_5.bungee.api.ChatMessageType;
 import net.md_5.bungee.api.chat.TextComponent;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.configuration.ConfigurationSection;
+import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
-import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.plugin.Plugin;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
 
 public class BlockBreakListener implements Listener {
-    private static final long STONE_RESTORE_DELAY = 1L;
-    private static final long BLOCK_RESPAWN_DELAY = 200L;
 
-    private final ConfigManager config;
-    private final WMine plugin;
-    private final DataConfigManager data;
+    private final Plugin plugin;
 
-    public BlockBreakListener(ConfigManager config, WMine plugin, DataConfigManager data) {
-        this.config = config;
+    private final FileConfiguration config;
+    private final FileConfiguration data;
+
+    private final Map<UUID, Integer> blocksBroken = new HashMap<>();
+    private final Map<Block, Material> brokenBlocks = new HashMap<>();
+
+    public BlockBreakListener(Plugin plugin, ConfigManager configManager) {
         this.plugin = plugin;
-        this.data = data;
+
+        this.config = configManager.getConfig("config.yml");
+        this.data = configManager.getConfig("data.yml");
     }
 
     @EventHandler
     public void onBlockBreak(BlockBreakEvent event) {
         Player player = event.getPlayer();
-        Block brokenBlock = event.getBlock();
+        Block block = event.getBlock();
 
-        if (!isLocationInRange(brokenBlock.getLocation(), config.minLocation, config.maxLocation)) {
+        if (!isInMine(block.getLocation())) {
             return;
         }
 
-        Material blockMaterial = brokenBlock.getType();
-        Integer baseReward = config.blockRewards.get(blockMaterial);
-        if (baseReward == null) {
+        Material material = block.getType();
+        int baseReward = config.getInt("rewards." + material.name(), -1);
+
+        if (baseReward <= 0) {
             event.setCancelled(true);
             return;
         }
 
-        UUID playerId = player.getUniqueId();
-        int blocksBrokenByPlayer = config.blocksBroken.getOrDefault(playerId, 0);
+        UUID uuid = player.getUniqueId();
+        int broken = blocksBroken.getOrDefault(uuid, 0);
 
-        ConfigurationSection playerSection = data.getDataConfig().getConfigurationSection("players." + player.getName());
-        double costMultiplier = playerSection != null
-                ? playerSection.getDouble("costmultiplier", config.costmultiplier)
-                : config.costmultiplier;
-        int backpackSize = playerSection != null
-                ? playerSection.getInt("backpack", config.backpack)
-                : config.backpack;
+        ConfigurationSection playerSection =
+                data.getConfigurationSection("players." + player.getName());
 
-        if (blocksBrokenByPlayer >= backpackSize) {
+        double multiplier = playerSection != null
+                ? playerSection.getDouble("costmultiplier",
+                config.getDouble("defaults.costmultiplier"))
+                : config.getDouble("defaults.costmultiplier");
+
+        int backpack = playerSection != null
+                ? playerSection.getInt("backpack",
+                config.getInt("defaults.backpack"))
+                : config.getInt("defaults.backpack");
+
+        if (broken >= backpack) {
             event.setCancelled(true);
-            player.sendMessage("§cВы переполнены, сдайте ресурсы!");
+            player.sendMessage("§cВаш рюкзак переполнен!");
             return;
         }
 
-        double reward = baseReward * costMultiplier;
-        if (reward <= 0) {
-            player.sendMessage("Ошибка при получении валюты");
-            return;
-        }
+        int reward = (int) (baseReward * multiplier);
 
-        config.blocksBroken.put(playerId, blocksBrokenByPlayer + 1);
-        int currentEarnings = config.playerEarnings.getOrDefault(playerId, 0);
-        config.playerEarnings.put(playerId, currentEarnings + (int) reward);
+        blocksBroken.put(uuid, broken + 1);
 
-        brokenBlock.setType(Material.AIR);
+        block.setType(Material.AIR);
+
         player.spigot().sendMessage(
                 ChatMessageType.ACTION_BAR,
-                new TextComponent("§fВы сломали §6" + blockMaterial + "§f и получили §6" + reward + "$")
+                new TextComponent("§fВы получили §6" + reward + "$ §fза §6" + material.name())
         );
 
-        plugin.getServer().getScheduler().runTaskLater(plugin, () -> brokenBlock.setType(Material.STONE), STONE_RESTORE_DELAY);
+        long stoneDelay = config.getLong("settings.stone-restore-delay", 1L);
+        long respawnDelay = config.getLong("settings.block-respawn-delay", 200L);
 
-        Material nextMaterial = config.randomPlace
-                ? config.getRandomRewardMaterial(blockMaterial)
-                : blockMaterial;
+        Bukkit.getScheduler().runTaskLater(plugin,
+                () -> block.setType(Material.STONE), stoneDelay);
 
-        config.brokenBlocks.put(brokenBlock, nextMaterial);
-        startTimer(brokenBlock);
-    }
+        Material nextMaterial = material;
+        brokenBlocks.put(block, nextMaterial);
 
-    public boolean isLocationInRange(Location location, Location minLocation, Location maxLocation) {
-        double x = location.getX();
-        double y = location.getY();
-        double z = location.getZ();
-
-        return x >= minLocation.getX() && x <= maxLocation.getX()
-                && y >= minLocation.getY() && y <= maxLocation.getY()
-                && z >= minLocation.getZ() && z <= maxLocation.getZ();
-    }
-
-    private void startTimer(Block block) {
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                Material blockType = config.brokenBlocks.remove(block);
-                if (blockType != null) {
-                    block.setType(blockType);
-                }
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            Material type = brokenBlocks.remove(block);
+            if (type != null) {
+                block.setType(type);
             }
-        }.runTaskLater(plugin, BLOCK_RESPAWN_DELAY);
+        }, respawnDelay);
+    }
+
+    private boolean isInMine(Location loc) {
+        Location min = getLocation("mine.min");
+        Location max = getLocation("mine.max");
+
+        return loc.getX() >= min.getX() && loc.getX() <= max.getX()
+                && loc.getY() >= min.getY() && loc.getY() <= max.getY()
+                && loc.getZ() >= min.getZ() && loc.getZ() <= max.getZ();
+    }
+
+    private Location getLocation(String path) {
+        return new Location(
+                Bukkit.getWorlds().get(0),
+                config.getDouble(path + ".x"),
+                config.getDouble(path + ".y"),
+                config.getDouble(path + ".z")
+        );
     }
 }
