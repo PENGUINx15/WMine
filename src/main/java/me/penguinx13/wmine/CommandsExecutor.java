@@ -12,11 +12,9 @@ public class CommandsExecutor implements CommandExecutor {
     private static final String PLAYERS_PATH = "players.";
 
     private final WMine plugin;
-    private final DataConfigManager data;
 
-    public CommandsExecutor(WMine plugin, DataConfigManager data) {
+    public CommandsExecutor(WMine plugin) {
         this.plugin = plugin;
-        this.data = data;
     }
 
     @Override
@@ -99,11 +97,13 @@ public class CommandsExecutor implements CommandExecutor {
             return true;
         }
 
-        ConfigurationSection playerSection = data.getDataConfig().getConfigurationSection(PLAYERS_PATH + playerName);
+        ConfigurationSection playerSection = plugin.getDataConfig().getConfigurationSection(PLAYERS_PATH + playerName);
         if (playerSection == null) {
-            playerSection = data.getDataConfig().createSection(PLAYERS_PATH + playerName);
-            playerSection.set("backpack", plugin.getConfig().getInt("defaultValues.backpack"));
-            playerSection.set("costmultiplier", plugin.getConfig().getDouble("defaultValues.costmultiplier"));
+            playerSection = plugin.getDataConfig().createSection(PLAYERS_PATH + playerName);
+            playerSection.set("backpack", plugin.getMainConfig().getInt("defaultValues.backpack"));
+            playerSection.set("costmultiplier", plugin.getMainConfig().getDouble("defaultValues.costmultiplier"));
+            playerSection.set("earnings", 0);
+            playerSection.set("blocksBroken", 0);
         }
 
         double currentAmount = playerSection.getDouble(param);
@@ -126,7 +126,7 @@ public class CommandsExecutor implements CommandExecutor {
             }
         }
 
-        data.saveDataConfig();
+        plugin.saveDataConfig();
         return true;
     }
 }

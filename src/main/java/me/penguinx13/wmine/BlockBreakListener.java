@@ -18,23 +18,22 @@ import org.bukkit.plugin.Plugin;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.UUID;
 
 public class BlockBreakListener implements Listener {
 
+    private static final String PLAYERS_PATH = "players.";
+
     private final Plugin plugin;
+    private final WMine wMine;
 
     private final FileConfiguration config;
-    private final FileConfiguration data;
 
-    private final Map<UUID, Integer> blocksBroken = new HashMap<>();
     private final Map<Block, Material> brokenBlocks = new HashMap<>();
 
     public BlockBreakListener(Plugin plugin, ConfigManager configManager) {
         this.plugin = plugin;
-
+        this.wMine = (WMine) plugin;
         this.config = configManager.getConfig("config.yml");
-        this.data = configManager.getConfig("data.yml");
     }
 
     @EventHandler
@@ -54,21 +53,13 @@ public class BlockBreakListener implements Listener {
             return;
         }
 
-        UUID uuid = player.getUniqueId();
-        int broken = blocksBroken.getOrDefault(uuid, 0);
+        ConfigurationSection playerSection = getPlayerSection(player);
 
-        ConfigurationSection playerSection =
-                data.getConfigurationSection("players." + player.getName());
-
-        double multiplier = playerSection != null
-                ? playerSection.getDouble("costmultiplier",
-                config.getDouble("defaultValues.costmultiplier"))
-                : config.getDouble("defaultValues.costmultiplier");
-
-        int backpack = playerSection != null
-                ? playerSection.getInt("backpack",
-                config.getInt("defaultValues.backpack"))
-                : config.getInt("defaultValues.backpack");
+        int broken = playerSection.getInt("blocksBroken", 0);
+        double multiplier = playerSection.getDouble("costmultiplier",
+                config.getDouble("defaultValues.costmultiplier"));
+        int backpack = playerSection.getInt("backpack",
+                config.getInt("defaultValues.backpack"));
 
         if (broken >= backpack) {
             event.setCancelled(true);
@@ -77,8 +68,9 @@ public class BlockBreakListener implements Listener {
         }
 
         int reward = (int) (baseReward * multiplier);
-
-        blocksBroken.put(uuid, broken + 1);
+        playerSection.set("blocksBroken", broken + 1);
+        playerSection.set("earnings", playerSection.getInt("earnings", 0) + reward);
+        wMine.saveDataConfig();
 
         block.setType(Material.AIR);
 
@@ -102,6 +94,23 @@ public class BlockBreakListener implements Listener {
                 block.setType(type);
             }
         }, respawnDelay);
+    }
+
+    private ConfigurationSection getPlayerSection(Player player) {
+        String path = PLAYERS_PATH + player.getName();
+        FileConfiguration dataConfig = wMine.getDataConfig();
+        ConfigurationSection playerSection = dataConfig.getConfigurationSection(path);
+
+        if (playerSection == null) {
+            playerSection = dataConfig.createSection(path);
+            playerSection.set("backpack", config.getInt("defaultValues.backpack"));
+            playerSection.set("costmultiplier", config.getDouble("defaultValues.costmultiplier"));
+            playerSection.set("earnings", 0);
+            playerSection.set("blocksBroken", 0);
+            wMine.saveDataConfig();
+        }
+
+        return playerSection;
     }
 
     private boolean isInMine(Location loc) {
