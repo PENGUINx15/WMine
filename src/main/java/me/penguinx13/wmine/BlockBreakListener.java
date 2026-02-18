@@ -6,6 +6,7 @@ import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -46,7 +47,7 @@ public class BlockBreakListener implements Listener {
         }
 
         Material material = block.getType();
-        int baseReward = config.getInt("rewards." + material.name(), -1);
+        int baseReward = getBaseReward(material);
 
         if (baseReward <= 0) {
             event.setCancelled(true);
@@ -61,13 +62,13 @@ public class BlockBreakListener implements Listener {
 
         double multiplier = playerSection != null
                 ? playerSection.getDouble("costmultiplier",
-                config.getDouble("defaults.costmultiplier"))
-                : config.getDouble("defaults.costmultiplier");
+                config.getDouble("defaultValues.costmultiplier"))
+                : config.getDouble("defaultValues.costmultiplier");
 
         int backpack = playerSection != null
                 ? playerSection.getInt("backpack",
-                config.getInt("defaults.backpack"))
-                : config.getInt("defaults.backpack");
+                config.getInt("defaultValues.backpack"))
+                : config.getInt("defaultValues.backpack");
 
         if (broken >= backpack) {
             event.setCancelled(true);
@@ -104,20 +105,54 @@ public class BlockBreakListener implements Listener {
     }
 
     private boolean isInMine(Location loc) {
-        Location min = getLocation("mine.min");
-        Location max = getLocation("mine.max");
+        Location min = getMineLocation(true);
+        Location max = getMineLocation(false);
+
+        if (min == null || max == null || loc.getWorld() == null || !loc.getWorld().equals(min.getWorld())) {
+            return false;
+        }
 
         return loc.getX() >= min.getX() && loc.getX() <= max.getX()
                 && loc.getY() >= min.getY() && loc.getY() <= max.getY()
                 && loc.getZ() >= min.getZ() && loc.getZ() <= max.getZ();
     }
 
-    private Location getLocation(String path) {
-        return new Location(
-                Bukkit.getWorlds().get(0),
-                config.getDouble(path + ".x"),
-                config.getDouble(path + ".y"),
-                config.getDouble(path + ".z")
+    private int getBaseReward(Material material) {
+        ConfigurationSection blocksSection = config.getConfigurationSection("blocks");
+        if (blocksSection == null) {
+            return -1;
+        }
+
+        for (String key : blocksSection.getKeys(false)) {
+            ConfigurationSection blockSection = blocksSection.getConfigurationSection(key);
+            if (blockSection == null) {
+                continue;
+            }
+
+            Material configuredMaterial = Material.matchMaterial(blockSection.getString("block", ""));
+            if (configuredMaterial == material) {
+                return blockSection.getInt("cost", -1);
+            }
+        }
+
+        return -1;
+    }
+
+    private Location getMineLocation(boolean minPoint) {
+        String worldName = config.getString("location.world");
+        World world = worldName != null ? Bukkit.getWorld(worldName) : null;
+        if (world == null) {
+            return null;
+        }
+
+        String xPath = minPoint ? "location.minX" : "location.maxX";
+        String yPath = minPoint ? "location.minY" : "location.maxY";
+        String zPath = minPoint ? "location.minZ" : "location.maxZ";
+
+        return new Location(world,
+                config.getDouble(xPath),
+                config.getDouble(yPath),
+                config.getDouble(zPath)
         );
     }
 }
