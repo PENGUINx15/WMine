@@ -53,7 +53,7 @@ public class BlockBreakListener implements Listener {
             return;
         }
 
-        WMine.PlayerData playerData = wMine.getPlayerData(player);
+        PlayerData playerData = wMine.getPlayerData(player);
         int reward = (int) (baseReward * playerData.costMultiplier());
         wMine.addBrokenBlock(player, reward);
 
@@ -67,7 +67,7 @@ public class BlockBreakListener implements Listener {
     }
 
     private boolean isBackpackFull(Player player) {
-        WMine.PlayerData playerData = wMine.getPlayerData(player);
+        PlayerData playerData = wMine.getPlayerData(player);
         return playerData.blocksBroken() >= playerData.backpack();
     }
 
