@@ -218,7 +218,4 @@ public class WMine extends JavaPlugin implements Listener, CommandExecutor {
 
         return new PlayerData(defaultBackpack, defaultMultiplier, 0, 0);
     }
-
-    private record PlayerData(int backpack, double costMultiplier, int earnings, int blocksBroken) {
-    }
 }
