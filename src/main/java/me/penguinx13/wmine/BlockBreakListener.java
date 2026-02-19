@@ -8,6 +8,7 @@ import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.block.Block;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -16,7 +17,9 @@ import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.plugin.Plugin;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
 
 public class BlockBreakListener implements Listener {
 
@@ -74,16 +77,55 @@ public class BlockBreakListener implements Listener {
     private void scheduleBlockRestore(Block block, Material material) {
         long stoneDelay = config.getLong("settings.stone-restore-delay", 1L);
         long respawnDelay = config.getLong("settings.block-respawn-delay", 200L);
+        boolean randomPlace = config.getBoolean("randomPlace", false);
 
         Bukkit.getScheduler().runTaskLater(plugin, () -> block.setType(Material.STONE), stoneDelay);
 
-        brokenBlocks.put(block, material);
+        Material restoreMaterial = randomPlace ? getRandomConfiguredMaterial() : material;
+        brokenBlocks.put(block, restoreMaterial);
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             Material type = brokenBlocks.remove(block);
             if (type != null) {
                 block.setType(type);
             }
         }, respawnDelay);
+    }
+
+    private Material getRandomConfiguredMaterial() {
+        ConfigurationSection blocksSection = config.getConfigurationSection("blocks");
+        if (blocksSection == null) {
+            return Material.STONE;
+        }
+
+        List<String> keys = blocksSection.getKeys(false).stream().toList();
+        if (keys.isEmpty()) {
+            return Material.STONE;
+        }
+
+        int totalChance = 0;
+        for (String key : keys) {
+            totalChance += Math.max(0, blocksSection.getInt(key + ".chance", 0));
+        }
+
+        if (totalChance <= 0) {
+            String randomKey = keys.get(ThreadLocalRandom.current().nextInt(keys.size()));
+            Material fallbackMaterial = Material.matchMaterial(blocksSection.getString(randomKey + ".block", ""));
+            return fallbackMaterial != null ? fallbackMaterial : Material.STONE;
+        }
+
+        int random = ThreadLocalRandom.current().nextInt(totalChance);
+        int cumulativeChance = 0;
+        for (String key : keys) {
+            cumulativeChance += Math.max(0, blocksSection.getInt(key + ".chance", 0));
+            if (random < cumulativeChance) {
+                Material material = Material.matchMaterial(blocksSection.getString(key + ".block", ""));
+                if (material != null) {
+                    return material;
+                }
+            }
+        }
+
+        return Material.STONE;
     }
 
     private boolean isInMine(Location loc) {
