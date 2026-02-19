@@ -21,8 +21,6 @@ import java.util.Map;
 
 public class BlockBreakListener implements Listener {
 
-    private static final String PLAYERS_PATH = "players.";
-
     private final Plugin plugin;
     private final WMine wMine;
 
@@ -53,13 +51,9 @@ public class BlockBreakListener implements Listener {
             return;
         }
 
-        ConfigurationSection playerSection = getPlayerSection(player);
-
-        int broken = playerSection.getInt("blocksBroken", 0);
-        double multiplier = playerSection.getDouble("costmultiplier",
-                config.getDouble("defaultValues.costmultiplier"));
-        int backpack = playerSection.getInt("backpack",
-                config.getInt("defaultValues.backpack"));
+        int broken = wMine.getBlocksBroken(player);
+        double multiplier = wMine.getCostMultiplier(player);
+        int backpack = wMine.getBackpackSize(player);
 
         if (broken >= backpack) {
             event.setCancelled(true);
@@ -68,9 +62,7 @@ public class BlockBreakListener implements Listener {
         }
 
         int reward = (int) (baseReward * multiplier);
-        playerSection.set("blocksBroken", broken + 1);
-        playerSection.set("earnings", playerSection.getInt("earnings", 0) + reward);
-        wMine.saveDataConfig();
+        wMine.addBrokenBlock(player, reward);
 
         block.setType(Material.AIR);
 
@@ -94,23 +86,6 @@ public class BlockBreakListener implements Listener {
                 block.setType(type);
             }
         }, respawnDelay);
-    }
-
-    private ConfigurationSection getPlayerSection(Player player) {
-        String path = PLAYERS_PATH + player.getName();
-        FileConfiguration dataConfig = wMine.getDataConfig();
-        ConfigurationSection playerSection = dataConfig.getConfigurationSection(path);
-
-        if (playerSection == null) {
-            playerSection = dataConfig.createSection(path);
-            playerSection.set("backpack", config.getInt("defaultValues.backpack"));
-            playerSection.set("costmultiplier", config.getDouble("defaultValues.costmultiplier"));
-            playerSection.set("earnings", 0);
-            playerSection.set("blocksBroken", 0);
-            wMine.saveDataConfig();
-        }
-
-        return playerSection;
     }
 
     private boolean isInMine(Location loc) {

@@ -1,15 +1,14 @@
 package me.penguinx13.wmine;
 
 import org.bukkit.Bukkit;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
-import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 
 public class CommandsExecutor implements CommandExecutor {
-    private static final String PLAYERS_PATH = "players.";
 
     private final WMine plugin;
 
@@ -97,27 +96,22 @@ public class CommandsExecutor implements CommandExecutor {
             return true;
         }
 
-        ConfigurationSection playerSection = plugin.getDataConfig().getConfigurationSection(PLAYERS_PATH + playerName);
-        if (playerSection == null) {
-            playerSection = plugin.getDataConfig().createSection(PLAYERS_PATH + playerName);
-            playerSection.set("backpack", plugin.getMainConfig().getInt("defaultValues.backpack"));
-            playerSection.set("costmultiplier", plugin.getMainConfig().getDouble("defaultValues.costmultiplier"));
-            playerSection.set("earnings", 0);
-            playerSection.set("blocksBroken", 0);
-        }
+        OfflinePlayer offlinePlayer = Bukkit.getOfflinePlayer(playerName);
+        String uuid = offlinePlayer.getUniqueId().toString();
 
-        double currentAmount = playerSection.getDouble(param);
+        double currentAmount = plugin.getPlayerParameter(uuid, playerName, param);
+        double newValue;
         switch (operation) {
             case "add" -> {
-                playerSection.set(param, currentAmount + amount);
+                newValue = currentAmount + amount;
                 sender.sendMessage("§fЗначение §6" + param + "§f для игрока §6" + playerName + " §fувеличено на§6 " + amount);
             }
             case "set" -> {
-                playerSection.set(param, amount);
+                newValue = amount;
                 sender.sendMessage("§fЗначение §6" + param + " §fдля игрока§6 " + playerName + "§f установлено на §6" + amount);
             }
             case "rem" -> {
-                playerSection.set(param, currentAmount - amount);
+                newValue = currentAmount - amount;
                 sender.sendMessage("§fЗначение §6" + param + "§f для игрока §6" + playerName + " §fуменьшено на §6" + amount);
             }
             default -> {
@@ -126,7 +120,7 @@ public class CommandsExecutor implements CommandExecutor {
             }
         }
 
-        plugin.saveDataConfig();
+        plugin.setPlayerParameter(uuid, playerName, param, newValue);
         return true;
     }
 }
