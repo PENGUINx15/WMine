@@ -61,21 +61,29 @@ public class WMine extends JavaPlugin implements Listener, CommandExecutor {
         return configManager.getConfig("config.yml");
     }
 
-    public int getCurrencyCount(Player player) {
-        return getOrCreatePlayerData(player).earnings();
+    public PlayerData getPlayerData(Player player) {
+        return getOrCreatePlayerData(player.getUniqueId().toString(), player.getName());
     }
 
     public double getBlockReward(Player player, Material blockType) {
-        if (blockType == null) {
+        int reward = getBaseBlockReward(blockType);
+        if (reward <= 0) {
             return 0;
+        }
+
+        return reward * getPlayerData(player).costMultiplier();
+    }
+
+    public int getBaseBlockReward(Material blockType) {
+        if (blockType == null) {
+            return -1;
         }
 
         ConfigurationSection blocksSection = getMainConfig().getConfigurationSection("blocks");
         if (blocksSection == null) {
-            return 0;
+            return -1;
         }
 
-        Integer reward = null;
         for (String key : blocksSection.getKeys(false)) {
             ConfigurationSection blockSection = blocksSection.getConfigurationSection(key);
             if (blockSection == null) {
@@ -84,32 +92,15 @@ public class WMine extends JavaPlugin implements Listener, CommandExecutor {
 
             Material configuredMaterial = Material.matchMaterial(blockSection.getString("block", ""));
             if (configuredMaterial == blockType) {
-                reward = blockSection.getInt("cost", 0);
-                break;
+                return blockSection.getInt("cost", -1);
             }
         }
 
-        if (reward == null) {
-            return 0;
-        }
-
-        return reward * getCostMultiplier(player);
-    }
-
-    public double getCostMultiplier(Player player) {
-        return getOrCreatePlayerData(player).costMultiplier();
-    }
-
-    public int getBackpackSize(Player player) {
-        return getOrCreatePlayerData(player).backpack();
-    }
-
-    public int getBlocksBroken(Player player) {
-        return getOrCreatePlayerData(player).blocksBroken();
+        return -1;
     }
 
     public void addBrokenBlock(Player player, int reward) {
-        PlayerData playerData = getOrCreatePlayerData(player);
+        PlayerData playerData = getPlayerData(player);
         sqliteManager.executeUpdate(
                 "UPDATE players SET name = ?, blocksBroken = ?, earnings = ? WHERE uuid = ?",
                 player.getName(),
@@ -148,7 +139,7 @@ public class WMine extends JavaPlugin implements Listener, CommandExecutor {
     }
 
     public void claimCurrencyReward(Player player) {
-        int currencyEarned = getCurrencyCount(player);
+        PlayerData playerData = getPlayerData(player);
 
         RegisteredServiceProvider<Economy> registration = getServer().getServicesManager().getRegistration(Economy.class);
         if (registration == null) {
@@ -158,7 +149,7 @@ public class WMine extends JavaPlugin implements Listener, CommandExecutor {
         }
 
         Economy economy = registration.getProvider();
-        economy.depositPlayer(player, currencyEarned);
+        economy.depositPlayer(player, playerData.earnings());
 
         sqliteManager.executeUpdate(
                 "UPDATE players SET earnings = 0, blocksBroken = 0, name = ? WHERE uuid = ?",
@@ -166,22 +157,16 @@ public class WMine extends JavaPlugin implements Listener, CommandExecutor {
                 player.getUniqueId().toString()
         );
 
-        player.sendMessage("§fВы получили зарплату §6" + currencyEarned + "$");
+        player.sendMessage("§fВы получили зарплату §6" + playerData.earnings() + "$");
     }
 
     public void showPlayerInfo(Player player) {
-        int currencyEarned = getCurrencyCount(player);
-        int blocksBrokenByPlayer = getBlocksBroken(player);
-        int backpackSize = getBackpackSize(player);
+        PlayerData playerData = getPlayerData(player);
 
         player.sendMessage("§f---------------------[§6Шахта§f]---------------------");
-        player.sendMessage("§fОжидаемая зарплата: §6" + currencyEarned + "$");
-        player.sendMessage("§fРюкзак: §e" + blocksBrokenByPlayer + "§f/§6" + backpackSize);
+        player.sendMessage("§fОжидаемая зарплата: §6" + playerData.earnings() + "$");
+        player.sendMessage("§fРюкзак: §e" + playerData.blocksBroken() + "§f/§6" + playerData.backpack());
         player.sendMessage("§f§n-------------------------------------------------");
-    }
-
-    private PlayerData getOrCreatePlayerData(Player player) {
-        return getOrCreatePlayerData(player.getUniqueId().toString(), player.getName());
     }
 
     private PlayerData getOrCreatePlayerData(String uuid, String playerName) {
@@ -216,6 +201,6 @@ public class WMine extends JavaPlugin implements Listener, CommandExecutor {
         return new PlayerData(defaultBackpack, defaultMultiplier, 0, 0);
     }
 
-    private record PlayerData(int backpack, double costMultiplier, int earnings, int blocksBroken) {
+    public record PlayerData(int backpack, double costMultiplier, int earnings, int blocksBroken) {
     }
 }

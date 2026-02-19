@@ -8,7 +8,6 @@ import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.block.Block;
-import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -23,9 +22,7 @@ public class BlockBreakListener implements Listener {
 
     private final Plugin plugin;
     private final WMine wMine;
-
     private final FileConfiguration config;
-
     private final Map<Block, Material> brokenBlocks = new HashMap<>();
 
     public BlockBreakListener(Plugin plugin, ConfigManager configManager) {
@@ -44,42 +41,43 @@ public class BlockBreakListener implements Listener {
         }
 
         Material material = block.getType();
-        int baseReward = getBaseReward(material);
-
+        int baseReward = wMine.getBaseBlockReward(material);
         if (baseReward <= 0) {
             event.setCancelled(true);
             return;
         }
 
-        int broken = wMine.getBlocksBroken(player);
-        double multiplier = wMine.getCostMultiplier(player);
-        int backpack = wMine.getBackpackSize(player);
-
-        if (broken >= backpack) {
+        if (isBackpackFull(player)) {
             event.setCancelled(true);
             player.sendMessage("§cВаш рюкзак переполнен!");
             return;
         }
 
-        int reward = (int) (baseReward * multiplier);
+        WMine.PlayerData playerData = wMine.getPlayerData(player);
+        int reward = (int) (baseReward * playerData.costMultiplier());
         wMine.addBrokenBlock(player, reward);
 
         block.setType(Material.AIR);
-
         player.spigot().sendMessage(
                 ChatMessageType.ACTION_BAR,
                 new TextComponent("§fВы получили §6" + reward + "$ §fза §6" + material.name())
         );
 
+        scheduleBlockRestore(block, material);
+    }
+
+    private boolean isBackpackFull(Player player) {
+        WMine.PlayerData playerData = wMine.getPlayerData(player);
+        return playerData.blocksBroken() >= playerData.backpack();
+    }
+
+    private void scheduleBlockRestore(Block block, Material material) {
         long stoneDelay = config.getLong("settings.stone-restore-delay", 1L);
         long respawnDelay = config.getLong("settings.block-respawn-delay", 200L);
 
-        Bukkit.getScheduler().runTaskLater(plugin,
-                () -> block.setType(Material.STONE), stoneDelay);
+        Bukkit.getScheduler().runTaskLater(plugin, () -> block.setType(Material.STONE), stoneDelay);
 
-        Material nextMaterial = material;
-        brokenBlocks.put(block, nextMaterial);
-
+        brokenBlocks.put(block, material);
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             Material type = brokenBlocks.remove(block);
             if (type != null) {
@@ -101,27 +99,6 @@ public class BlockBreakListener implements Listener {
                 && loc.getZ() >= min.getZ() && loc.getZ() <= max.getZ();
     }
 
-    private int getBaseReward(Material material) {
-        ConfigurationSection blocksSection = config.getConfigurationSection("blocks");
-        if (blocksSection == null) {
-            return -1;
-        }
-
-        for (String key : blocksSection.getKeys(false)) {
-            ConfigurationSection blockSection = blocksSection.getConfigurationSection(key);
-            if (blockSection == null) {
-                continue;
-            }
-
-            Material configuredMaterial = Material.matchMaterial(blockSection.getString("block", ""));
-            if (configuredMaterial == material) {
-                return blockSection.getInt("cost", -1);
-            }
-        }
-
-        return -1;
-    }
-
     private Location getMineLocation(boolean minPoint) {
         String worldName = config.getString("location.world");
         World world = worldName != null ? Bukkit.getWorld(worldName) : null;
@@ -133,10 +110,6 @@ public class BlockBreakListener implements Listener {
         String yPath = minPoint ? "location.minY" : "location.maxY";
         String zPath = minPoint ? "location.minZ" : "location.maxZ";
 
-        return new Location(world,
-                config.getDouble(xPath),
-                config.getDouble(yPath),
-                config.getDouble(zPath)
-        );
+        return new Location(world, config.getDouble(xPath), config.getDouble(yPath), config.getDouble(zPath));
     }
 }
