@@ -43,7 +43,7 @@ public class Placeholders extends PlaceholderExpansion {
             return "";
         }
 
-        WMine.PlayerData playerData = plugin.getPlayerData(player);
+        PlayerData playerData = plugin.getPlayerData(player);
         return switch (params) {
             case "money" -> String.valueOf(playerData.earnings());
             case "backpack" -> String.valueOf(playerData.backpack());

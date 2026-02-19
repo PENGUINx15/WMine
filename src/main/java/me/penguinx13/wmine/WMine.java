@@ -13,18 +13,19 @@ import org.bukkit.event.Listener;
 import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.util.Objects;
 
 public class WMine extends JavaPlugin implements Listener, CommandExecutor {
+
+    private static WMine instance;
 
     private ConfigManager configManager;
     private SQLiteManager sqliteManager;
 
     @Override
     public void onEnable() {
+        instance = this;
+
         configManager = new ConfigManager(this);
         configManager.registerConfig("config.yml");
 
@@ -52,6 +53,8 @@ public class WMine extends JavaPlugin implements Listener, CommandExecutor {
 
     @Override
     public void onDisable() {
+        instance = null;
+
         if (sqliteManager != null) {
             sqliteManager.disconnect();
         }
@@ -62,7 +65,7 @@ public class WMine extends JavaPlugin implements Listener, CommandExecutor {
     }
 
     public PlayerData getPlayerData(Player player) {
-        return getOrCreatePlayerData(player.getUniqueId().toString(), player.getName());
+        return PlayerData.getOrCreate(player);
     }
 
     public double getBlockReward(Player player, Material blockType) {
@@ -100,42 +103,15 @@ public class WMine extends JavaPlugin implements Listener, CommandExecutor {
     }
 
     public void addBrokenBlock(Player player, int reward) {
-        PlayerData playerData = getPlayerData(player);
-        sqliteManager.executeUpdate(
-                "UPDATE players SET name = ?, blocksBroken = ?, earnings = ? WHERE uuid = ?",
-                player.getName(),
-                playerData.blocksBroken() + 1,
-                playerData.earnings() + reward,
-                player.getUniqueId().toString()
-        );
+        PlayerData.addBrokenBlock(player, reward);
     }
 
     public double getPlayerParameter(String uuid, String playerName, String parameter) {
-        PlayerData playerData = getOrCreatePlayerData(uuid, playerName);
-        if ("backpack".equals(parameter)) {
-            return playerData.backpack();
-        }
-        return playerData.costMultiplier();
+        return PlayerData.getParameter(uuid, playerName, parameter);
     }
 
     public void setPlayerParameter(String uuid, String playerName, String parameter, double value) {
-        if ("backpack".equals(parameter)) {
-            int backpack = Math.max(0, (int) Math.round(value));
-            sqliteManager.executeUpdate(
-                    "UPDATE players SET name = ?, backpack = ? WHERE uuid = ?",
-                    playerName,
-                    backpack,
-                    uuid
-            );
-            return;
-        }
-
-        sqliteManager.executeUpdate(
-                "UPDATE players SET name = ?, costmultiplier = ? WHERE uuid = ?",
-                playerName,
-                Math.max(0, value),
-                uuid
-        );
+        PlayerData.setParameter(uuid, playerName, parameter, value);
     }
 
     public void claimCurrencyReward(Player player) {
@@ -151,11 +127,7 @@ public class WMine extends JavaPlugin implements Listener, CommandExecutor {
         Economy economy = registration.getProvider();
         economy.depositPlayer(player, playerData.earnings());
 
-        sqliteManager.executeUpdate(
-                "UPDATE players SET earnings = 0, blocksBroken = 0, name = ? WHERE uuid = ?",
-                player.getName(),
-                player.getUniqueId().toString()
-        );
+        PlayerData.resetClaimData(player);
 
         player.sendMessage("§fВы получили зарплату §6" + playerData.earnings() + "$");
     }
@@ -169,35 +141,13 @@ public class WMine extends JavaPlugin implements Listener, CommandExecutor {
         player.sendMessage("§f§n-------------------------------------------------");
     }
 
-    private PlayerData getOrCreatePlayerData(String uuid, String playerName) {
-        int defaultBackpack = getMainConfig().getInt("defaultValues.backpack");
-        double defaultMultiplier = getMainConfig().getDouble("defaultValues.costmultiplier");
 
-        try (PreparedStatement statement = sqliteManager.prepareStatement(
-                "SELECT backpack, costmultiplier, earnings, blocksBroken FROM players WHERE uuid = ?",
-                uuid
-        ); ResultSet resultSet = statement.executeQuery()) {
+    public static WMine getInstance() {
+        return instance;
+    }
 
-            if (resultSet.next()) {
-                return new PlayerData(
-                        resultSet.getInt("backpack"),
-                        resultSet.getDouble("costmultiplier"),
-                        resultSet.getInt("earnings"),
-                        resultSet.getInt("blocksBroken")
-                );
-            }
-        } catch (SQLException exception) {
-            getLogger().severe("SQL error while reading player data: " + exception.getMessage());
-        }
-
-        sqliteManager.executeUpdate(
-                "INSERT INTO players (uuid, name, backpack, costmultiplier, earnings, blocksBroken) VALUES (?, ?, ?, ?, 0, 0)",
-                uuid,
-                playerName,
-                defaultBackpack,
-                defaultMultiplier
-        );
-
-        return new PlayerData(defaultBackpack, defaultMultiplier, 0, 0);
+    SQLiteManager getSqliteManager() {
+        return sqliteManager;
     }
 }
+
