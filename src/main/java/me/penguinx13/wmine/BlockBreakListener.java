@@ -53,7 +53,8 @@ public class BlockBreakListener implements Listener {
             return;
         }
 
-        int reward = (int) (baseReward * wMine.getCostMultiplier(player));
+        WMine.PlayerData playerData = wMine.getPlayerData(player);
+        int reward = (int) (baseReward * playerData.costMultiplier());
         wMine.addBrokenBlock(player, reward);
 
         block.setType(Material.AIR);
@@ -66,7 +67,8 @@ public class BlockBreakListener implements Listener {
     }
 
     private boolean isBackpackFull(Player player) {
-        return wMine.getBlocksBroken(player) >= wMine.getBackpackSize(player);
+        WMine.PlayerData playerData = wMine.getPlayerData(player);
+        return playerData.blocksBroken() >= playerData.backpack();
     }
 
     private void scheduleBlockRestore(Block block, Material material) {
