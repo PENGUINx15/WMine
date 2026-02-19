@@ -43,27 +43,22 @@ public class Placeholders extends PlaceholderExpansion {
             return "";
         }
 
-        if (params.equals("money")) {
-            return String.valueOf(plugin.getCurrencyCount(player));
+        return switch (params) {
+            case "money" -> String.valueOf(plugin.getCurrencyCount(player));
+            case "backpack" -> String.valueOf(plugin.getBackpackSize(player));
+            case "cm" -> String.valueOf(plugin.getCostMultiplier(player));
+            case "broken" -> String.valueOf(plugin.getBlocksBroken(player));
+            default -> getRewardPlaceholder(player, params);
+        };
+    }
+
+    private String getRewardPlaceholder(Player player, String params) {
+        if (!params.startsWith("reward_")) {
+            return null;
         }
-        
-        if (params.equals("backpack")) {
-            return String.valueOf(plugin.getBackpackSize(player));
-        }
-        
-        if (params.equals("cm")) {
-            return String.valueOf(plugin.getCostMultiplier(player));
-        }
-        
-        if (params.equals("broken")) {
-            return String.valueOf(plugin.getBlocksBroken(player));
-        }
-        
-        if (params.startsWith("reward_")) {
-        	String blockTypeName = params.substring("reward_".length());
-        	Material blockType = Material.matchMaterial(blockTypeName);
-            return String.valueOf(plugin.getBlockReward(player, blockType));
-        }
-        return null;
+
+        String blockTypeName = params.substring("reward_".length());
+        Material blockType = Material.matchMaterial(blockTypeName);
+        return String.valueOf(plugin.getBlockReward(player, blockType));
     }
 }

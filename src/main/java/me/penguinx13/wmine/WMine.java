@@ -66,16 +66,24 @@ public class WMine extends JavaPlugin implements Listener, CommandExecutor {
     }
 
     public double getBlockReward(Player player, Material blockType) {
-        if (blockType == null) {
+        int reward = getBaseBlockReward(blockType);
+        if (reward <= 0) {
             return 0;
+        }
+
+        return reward * getCostMultiplier(player);
+    }
+
+    public int getBaseBlockReward(Material blockType) {
+        if (blockType == null) {
+            return -1;
         }
 
         ConfigurationSection blocksSection = getMainConfig().getConfigurationSection("blocks");
         if (blocksSection == null) {
-            return 0;
+            return -1;
         }
 
-        Integer reward = null;
         for (String key : blocksSection.getKeys(false)) {
             ConfigurationSection blockSection = blocksSection.getConfigurationSection(key);
             if (blockSection == null) {
@@ -84,16 +92,11 @@ public class WMine extends JavaPlugin implements Listener, CommandExecutor {
 
             Material configuredMaterial = Material.matchMaterial(blockSection.getString("block", ""));
             if (configuredMaterial == blockType) {
-                reward = blockSection.getInt("cost", 0);
-                break;
+                return blockSection.getInt("cost", -1);
             }
         }
 
-        if (reward == null) {
-            return 0;
-        }
-
-        return reward * getCostMultiplier(player);
+        return -1;
     }
 
     public double getCostMultiplier(Player player) {

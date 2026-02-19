@@ -10,6 +10,8 @@ import org.jetbrains.annotations.NotNull;
 
 public class CommandsExecutor implements CommandExecutor {
 
+    private static final String MSG_ONLY_PLAYER = "§cЭту команду моут использовать только игроки.";
+
     private final WMine plugin;
 
     public CommandsExecutor(WMine plugin) {
@@ -23,8 +25,7 @@ public class CommandsExecutor implements CommandExecutor {
             return false;
         }
 
-        String subCommand = args[0].toLowerCase();
-        return switch (subCommand) {
+        return switch (args[0].toLowerCase()) {
             case "claim" -> handleClaim(sender);
             case "info" -> handleInfo(sender);
             case "reload" -> handleReload(sender);
@@ -34,20 +35,22 @@ public class CommandsExecutor implements CommandExecutor {
     }
 
     private boolean handleClaim(CommandSender sender) {
-        if (sender instanceof Player player) {
-            plugin.claimCurrencyReward(player);
-        } else {
-            sender.sendMessage("§cЭту команду моут использовать только игроки.");
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(MSG_ONLY_PLAYER);
+            return true;
         }
+
+        plugin.claimCurrencyReward(player);
         return true;
     }
 
     private boolean handleInfo(CommandSender sender) {
-        if (sender instanceof Player player) {
-            plugin.showPlayerInfo(player);
-        } else {
-            sender.sendMessage("§cЭту команду моут использовать только игроки.");
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(MSG_ONLY_PLAYER);
+            return true;
         }
+
+        plugin.showPlayerInfo(player);
         return true;
     }
 
@@ -75,52 +78,65 @@ public class CommandsExecutor implements CommandExecutor {
         }
 
         String playerName = args[1];
-        String param = args[2].toLowerCase();
+        String parameter = args[2].toLowerCase();
         String operation = args[3].toLowerCase();
-
-        double amount;
-        try {
-            amount = Double.parseDouble(args[4]);
-        } catch (NumberFormatException e) {
-            sender.sendMessage("§cНеправельный формат.");
-            return false;
-        }
 
         if (!playerName.matches("[A-Za-z0-9_]+")) {
             sender.sendMessage("§cНеправельное имя ирока.");
             return false;
         }
 
-        if (!param.equals("backpack") && !param.equals("costmultiplier")) {
+        if (!parameter.equals("backpack") && !parameter.equals("costmultiplier")) {
             sender.sendMessage("§cНедействительный параментр, используйте: 'backpack' или 'costmultiplier'.");
             return true;
+        }
+
+        Double amount = parseAmount(sender, args[4]);
+        if (amount == null) {
+            return false;
         }
 
         OfflinePlayer offlinePlayer = Bukkit.getOfflinePlayer(playerName);
         String uuid = offlinePlayer.getUniqueId().toString();
 
-        double currentAmount = plugin.getPlayerParameter(uuid, playerName, param);
-        double newValue;
-        switch (operation) {
-            case "add" -> {
-                newValue = currentAmount + amount;
-                sender.sendMessage("§fЗначение §6" + param + "§f для игрока §6" + playerName + " §fувеличено на§6 " + amount);
-            }
-            case "set" -> {
-                newValue = amount;
-                sender.sendMessage("§fЗначение §6" + param + " §fдля игрока§6 " + playerName + "§f установлено на §6" + amount);
-            }
-            case "rem" -> {
-                newValue = currentAmount - amount;
-                sender.sendMessage("§fЗначение §6" + param + "§f для игрока §6" + playerName + " §fуменьшено на §6" + amount);
-            }
-            default -> {
-                sender.sendMessage("§cНедействительная операция, используйте: 'add', 'set' или 'rem'.");
-                return true;
-            }
+        double currentValue = plugin.getPlayerParameter(uuid, playerName, parameter);
+        double newValue = calculateValue(currentValue, amount, operation);
+
+        if (Double.isNaN(newValue)) {
+            sender.sendMessage("§cНедействительная операция, используйте: 'add', 'set' или 'rem'.");
+            return true;
         }
 
-        plugin.setPlayerParameter(uuid, playerName, param, newValue);
+        sendUpgradeMessage(sender, parameter, playerName, amount, operation);
+        plugin.setPlayerParameter(uuid, playerName, parameter, newValue);
         return true;
+    }
+
+    private Double parseAmount(CommandSender sender, String rawAmount) {
+        try {
+            return Double.parseDouble(rawAmount);
+        } catch (NumberFormatException exception) {
+            sender.sendMessage("§cНеправельный формат.");
+            return null;
+        }
+    }
+
+    private double calculateValue(double currentValue, double amount, String operation) {
+        return switch (operation) {
+            case "add" -> currentValue + amount;
+            case "set" -> amount;
+            case "rem" -> currentValue - amount;
+            default -> Double.NaN;
+        };
+    }
+
+    private void sendUpgradeMessage(CommandSender sender, String parameter, String playerName, double amount, String operation) {
+        switch (operation) {
+            case "add" -> sender.sendMessage("§fЗначение §6" + parameter + "§f для игрока §6" + playerName + " §fувеличено на§6 " + amount);
+            case "set" -> sender.sendMessage("§fЗначение §6" + parameter + " §fдля игрока§6 " + playerName + "§f установлено на §6" + amount);
+            case "rem" -> sender.sendMessage("§fЗначение §6" + parameter + "§f для игрока §6" + playerName + " §fуменьшено на §6" + amount);
+            default -> {
+            }
+        }
     }
 }
