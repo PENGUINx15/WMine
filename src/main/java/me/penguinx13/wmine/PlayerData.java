@@ -1,6 +1,6 @@
 package me.penguinx13.wmine;
 
-import me.penguinx13.wapi.Managers.SQLiteManager;
+import me.penguinx13.wapi.managers.SQLiteManager;
 import org.bukkit.entity.Player;
 
 import java.sql.PreparedStatement;

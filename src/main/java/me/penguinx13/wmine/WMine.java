@@ -1,7 +1,7 @@
 package me.penguinx13.wmine;
 
-import me.penguinx13.wapi.Managers.ConfigManager;
-import me.penguinx13.wapi.Managers.SQLiteManager;
+import me.penguinx13.wapi.managers.ConfigManager;
+import me.penguinx13.wapi.managers.SQLiteManager;
 import net.milkbowl.vault.economy.Economy;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;

@@ -1,6 +1,6 @@
 package me.penguinx13.wmine;
 
-import me.penguinx13.wapi.Managers.ConfigManager;
+import me.penguinx13.wapi.managers.ConfigManager;
 import net.md_5.bungee.api.ChatMessageType;
 import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.Bukkit;

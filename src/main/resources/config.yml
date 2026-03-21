@@ -1,4 +1,4 @@
-# Пример конфигурации плагина WMine
+
 location:
   world: world
   minX: 1181
@@ -8,10 +8,6 @@ location:
   maxY: 112
   maxZ: 1026
 
-# Список блоков, доступных в шахте
-# block  — Bukkit Material
-# cost   — базовая награда за блок
-# chance — поле для совместимости/будущего функционала
 blocks:
   1:
     block: COAL_ORE
@@ -34,15 +30,12 @@ blocks:
     cost: 5
     chance: 10
 
-# Настройки восстановления блоков (в тиках)
 settings:
   stone-restore-delay: 1
   block-respawn-delay: 200
 
-# Значения по умолчанию для новых игроков
 defaultValues:
   backpack: 50
   costmultiplier: 1.0
 
-# При true блоки могут размещаться случайно (если реализовано в логике)
 randomPlace: false
